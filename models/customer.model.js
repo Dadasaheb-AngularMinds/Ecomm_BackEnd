@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
-const {roles} = require('../config/roles')
 
-const userSchema = new mongoose.Schema(
+const customerSchema = new mongoose.Schema(
   {
     username: {
       type: String,
@@ -17,16 +16,10 @@ const userSchema = new mongoose.Schema(
       required: false,
       trim: true,
     },
-    _org: {
-      type: mongoose.Types.ObjectId,
-      ref: 'organizations',
-    },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
-      lowercase: true,
     },
     password: {
       type: String,
@@ -36,8 +29,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: roles,
-      default: 'User',
+      default: 'Customer',
     },
     isEmailVerified: {
       type: Boolean,
@@ -65,4 +57,4 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('Customer', customerSchema);
