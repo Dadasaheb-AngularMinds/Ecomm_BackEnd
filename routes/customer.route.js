@@ -22,7 +22,7 @@ router.route('/login')
     .post(loginLimiter, customerController.login)
 
 router.route('/refresh')
-    .get(customerController.refresh)
+    .get(verifyJWT,customerController.refresh)
 
 router.route('/logout')
     .post(customerController.logout)
