@@ -2,135 +2,170 @@ const Customer = require('../models/customer.model');
 const Org = require('../models/org.model');
 const asyncHandler = require('express-async-handler');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const ApiError = require('../utils/ApiError');
+const { authService } = require('../services');
+
+const httpStatus = require('http-status');
 
 // @desc Create new Customer
 // @route POST /customers
 // @access Private
 const createNewCustomer = asyncHandler(async (req, res) => {
-  const { username, password, roles, ...rest } = req.body;
+  const { username, password, email, roles, ...rest } = req.body;
   // Confirm data
   if (!username || !password) {
-    return res.status(400).json({ message: 'All fields are required' });
+    return res.status(httpStatus.BAD_REQUEST).json({
+      error: 'Bad Request',
+      code: httpStatus.BAD_REQUEST,
+      message: 'All fields are required',
+    });
   }
   // Check for duplicate username
   const duplicate = await Customer.findOne({ username }).lean().exec();
   if (duplicate) {
-    return res.status(409).json({ message: 'Duplicate username' });
+    return res.status(httpStatus.CONFLICT).json({
+      error: 'Bad Request',
+      code: httpStatus.CONFLICT,
+      message: 'Duplicate username',
+    });
   }
   // Hash password
   const hashedPwd = await bcrypt.hash(password, 10); // salt rounds
-  const customerObject = { username, password: hashedPwd, ...rest };
+  const customerObject = { username, password: hashedPwd, email, ...rest };
   // Create and store new Customer
-  const customer = await Customer.create(customerObject);
-  if (customer) {
-    //created
-    res
-      .status(201)
-      .json({ message: `New user ${username} created`, data: customer });
-  } else {
-    res.status(400).json({ message: 'Invalid user data received' });
+  try {
+    const customer = await Customer.create(customerObject);
+    if (customer) {
+      res.status(201).json({
+        result: { message: `New user ${username} created`, data: customer },
+      });
+    } else {
+      res.status(400).json({ message: 'Invalid user data received' });
+    }
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(httpStatus.CONFLICT).json({
+        error: 'Bad Request',
+        code: httpStatus.CONFLICT,
+        message: 'User already exists with this e-mail',
+      });
+    } else {
+      return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'INTERNAL_SERVER_ERROR',
+        code: httpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Something went wrong',
+      });
+    }
   }
 });
-
 
 // @desc Login
 // @route POST /auth
 // @access Public
 const login = asyncHandler(async (req, res) => {
-  const { username, password } = req.body
-
+  const { username, password } = req.body;
   if (!username || !password) {
-      return res.status(400).json({ message: 'All fields are required' })
+    return res.status(httpStatus.BAD_REQUEST).json({
+      error: 'Bad Request',
+      code: httpStatus.BAD_REQUEST,
+      message: 'All fields are required',
+    });
   }
-
-  const foundUser = await Customer.findOne({ username }).exec()
-
+  const foundUser = await authService.loginUserWithEmailAndPassword(
+    username,
+    password
+  );
   if (!foundUser || !foundUser.active) {
-      return res.status(401).json({ message: 'Unauthorized' })
+    return res.status(httpStatus.NOT_FOUND).json({
+      error: 'Not Found',
+      code: httpStatus.NOT_FOUND,
+      message: 'User not found',
+    });
   }
-
-  const match = await bcrypt.compare(password, foundUser.password)
-
-  if (!match) return res.status(401).json({ message: 'Unauthorized' })
-
+  const match = await bcrypt.compare(password, foundUser.password);
+  if (!match)
+    return res.status(httpStatus.UNAUTHORIZED).json({
+      error: 'Unauthorized',
+      code: httpStatus.UNAUTHORIZED,
+      message: 'Incorrect username or password',
+    });
   const accessToken = jwt.sign(
-      {
-          "UserInfo": {
-              "username": foundUser.username,
-              "roles": foundUser.role
-          }
+    {
+      UserInfo: {
+        username: foundUser.username,
+        roles: foundUser.role,
       },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '15m' }
-  )
-
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '15m' }
+  );
   const refreshToken = jwt.sign(
-      { "username": foundUser.username },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: '7d' }
-  )
-
-  // Create secure cookie with refresh token 
+    { username: foundUser.username },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: '7d' }
+  );
+  // Create secure cookie with refresh token
   res.cookie('jwt', refreshToken, {
-      httpOnly: true, //accessible only by web server 
-      secure: true, //https
-      sameSite: 'None', //cross-site cookie 
-      maxAge: 7 * 24 * 60 * 60 * 1000 //cookie expiry: set to match rT
-  })
-
-  // Send accessToken containing username and roles 
-  res.json({ accessToken })
-})
+    httpOnly: true, //accessible only by web server
+    secure: true, //https
+    sameSite: 'None', //cross-site cookie
+    maxAge: 7 * 24 * 60 * 60 * 1000, //cookie expiry: set to match rT
+  });
+  // Send accessToken containing username and roles
+  res.status(200).json({ token: accessToken, user: foundUser });
+});
 
 // @desc Refresh
 // @route GET /auth/refresh
 // @access Public - because access token has expired
 const refresh = (req, res) => {
-  const cookies = req.cookies
+  const cookies = req.cookies;
 
-  if (!cookies?.jwt) return res.status(401).json({ message: 'Unauthorized' })
+  if (!cookies?.jwt) return res.status(401).json({ message: 'Unauthorized' });
 
-  const refreshToken = cookies.jwt
+  const refreshToken = cookies.jwt;
 
   jwt.verify(
-      refreshToken,
-      process.env.REFRESH_TOKEN_SECRET,
-      asyncHandler(async (err, decoded) => {
-          if (err) return res.status(403).json({ message: 'Forbidden' })
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET,
+    asyncHandler(async (err, decoded) => {
+      if (err) return res.status(403).json({ message: 'Forbidden' });
 
-          const foundUser = await Customer.findOne({ username: decoded.username }).exec()
+      const foundUser = await Customer.findOne({
+        username: decoded.username,
+      }).exec();
 
-          if (!foundUser) return res.status(401).json({ message: 'Unauthorized' })
+      if (!foundUser) return res.status(401).json({ message: 'Unauthorized' });
 
-          const accessToken = jwt.sign(
-              {
-                  "UserInfo": {
-                      "username": foundUser.username,
-                      "roles": foundUser.role
-                  }
-              },
-              process.env.ACCESS_TOKEN_SECRET,
-              { expiresIn: '15m' }
-          )
+      const accessToken = jwt.sign(
+        {
+          UserInfo: {
+            username: foundUser.username,
+            roles: foundUser.role,
+          },
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: '15m' }
+      );
 
-          res.json({ accessToken })
-      })
-  )
-}
+      res.json({ accessToken });
+    })
+  );
+};
 
 // @desc Logout
 // @route POST /auth/logout
 // @access Public - just to clear cookie if exists
 const logout = (req, res) => {
-  const cookies = req.cookies
-  if (!cookies?.jwt) return res.sendStatus(204) //No content
-  res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true })
-  res.json({ message: 'Cookie cleared' })
-}
+  const cookies = req.cookies;
+  if (!cookies?.jwt) return res.sendStatus(204); //No content
+  res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true });
+  res.json({ message: 'Cookie cleared' });
+};
 
 // @desc Get all customers
-// @route GET /customers 
+// @route GET /customers
 // @access Private
 const getAllCustomers = asyncHandler(async (req, res) => {
   // Get all customers from MongoDB
@@ -205,7 +240,6 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   res.json(reply);
 });
 
-
 module.exports = {
   login,
   refresh,
@@ -214,4 +248,4 @@ module.exports = {
   createNewCustomer,
   updateCustomer,
   deleteCustomer,
-}
+};

@@ -1,30 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const customerController = require('../controllers/customer.controller');
-const loginLimiter = require('../middlewares/loginLimiter')
-const verifyJWT = require('../middlewares/verifyJWT')
+const loginLimiter = require('../middlewares/loginLimiter');
+const authValidation = require('../validations/auth.validation');
 
+const verifyJWT = require('../middlewares/verifyJWT');
+const validate = require('../middlewares/validate');
 
-router
-  .route('/register')
-  .post(customerController.createNewCustomer)
+router.route('/register').post(customerController.createNewCustomer);
 
-router
-  .route('/')
-  .get(customerController.getAllCustomers)
+router.route('/').get(customerController.getAllCustomers);
 
 router
   .route('/')
-  .patch(verifyJWT,customerController.updateCustomer)
+  .patch(verifyJWT, customerController.updateCustomer)
   .delete(customerController.deleteCustomer);
 
-router.route('/login')
-    .post(loginLimiter, customerController.login)
+router.post(
+  '/login',
+  loginLimiter,
+  // validate(authValidation.login),
+  customerController.login
+);
 
-router.route('/refresh')
-    .get(verifyJWT,customerController.refresh)
+router.route('/refresh').get(verifyJWT, customerController.refresh);
 
-router.route('/logout')
-    .post(customerController.logout)
+router.route('/logout').post(customerController.logout);
 
-module.exports = router
+module.exports = router;

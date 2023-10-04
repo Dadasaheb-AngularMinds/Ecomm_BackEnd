@@ -11,6 +11,9 @@ const jwt = require('jsonwebtoken')
 const register = asyncHandler(async (req, res) => {
   const { username, password } = req.body
 
+  console.log('Customer Registration')
+
+
   if (!username || !password) {
       return res.status(400).json({ message: 'All fields are required' })
   }
@@ -41,12 +44,13 @@ const register = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: '7d' }
   )
+//   req.session.userData = { username: 'john_doe' };
 
   // Create secure cookie with refresh token 
   res.cookie('jwt', refreshToken, {
       httpOnly: true, //accessible only by web server 
-      secure: true, //https
-      sameSite: 'None', //cross-site cookie 
+    //   secure: true, //https
+    //   sameSite: 'None', //cross-site cookie 
       maxAge: 7 * 24 * 60 * 60 * 1000 //cookie expiry: set to match rT
   })
 
@@ -59,10 +63,11 @@ const register = asyncHandler(async (req, res) => {
 // @route POST /auth
 // @access Public
 const login = asyncHandler(async (req, res) => {
+
   const { username, password } = req.body
 
   if (!username || !password) {
-      return res.status(400).json({ message: 'All fields are required' })
+      return res.status(400).json({ message: 'dsgdsggggsgsgsdg' })
   }
 
   const foundUser = await User.findOne({ username }).exec()
