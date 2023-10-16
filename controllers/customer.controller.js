@@ -5,7 +5,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const ApiError = require('../utils/ApiError');
 const { authService } = require('../services');
-
 const httpStatus = require('http-status');
 
 // @desc Create new Customer

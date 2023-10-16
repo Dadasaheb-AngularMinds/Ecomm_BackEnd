@@ -2,20 +2,20 @@ const mongoose = require('mongoose');
 
 const orgSchema = mongoose.Schema(
   {
-    _createdBy: {
-      type: mongoose.Types.ObjectId,
-      ref: 'User',
-    },
-    name: {
+    org_name: {
       type: String,
       required: true,
       trim: true,
     },
-    //   logo: {
-    //     type: mongoose.Types.ObjectId,
-    //     ref: 'File'
-    //   },
-
+    logo: {
+      type: mongoose.Types.ObjectId,
+      ref: 'File',
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     address: {
       type: String,
       trim: true,

@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const {roles} = require('../config/roles')
 
 const userSchema = new mongoose.Schema(
   {
@@ -32,12 +31,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: false,
       trim: true,
-      private: true, // used by the private plugin
+      private: true,
     },
     role: {
       type: String,
-      enum: roles,
-      default: 'User',
+      enum: ['user', 'admin'],
+      default: 'admin',
     },
     isEmailVerified: {
       type: Boolean,

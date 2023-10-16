@@ -32,6 +32,9 @@ app.use('/', require('./routes/root'));
 app.use('/users', require('./routes/user.route'));
 app.use('/auth', require('./routes/auth.route'));
 app.use('/customers', require('./routes/customer.route'));
+app.use('/file', require('./routes/file.route'));
+app.use('/product', require('./routes/product.route'));
+
 
 app.get('/set-cookie', (req, res) => {
   res.cookie('myCookie', 'Hello from cookie', {
